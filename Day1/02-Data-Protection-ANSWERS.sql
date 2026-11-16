@@ -68,12 +68,12 @@ SELECT holder_id, street, city FROM smith_ins.core.policyholders LIMIT 3;     --
 -- ──────────────────────────────────────────────────────────────────────────────
 USE ROLE smith_policy_admin;
 SELECT 'POLICYHOLDERS' AS table_name, ref_column_name, ref_arg_column_names, policy_kind, policy_name,
-       IFF(tag_name IS NULL, 'DIRECT', 'TAG: ' || tag_name || ' = ' || tag_value) AS applied_through
+       IFF(tag_name IS NULL, 'DIRECT', 'TAG: ' || tag_name || ' = ' || policy_name) AS applied_through
 FROM TABLE(smith_ins.information_schema.policy_references(
         ref_entity_name => 'smith_ins.core.policyholders', ref_entity_domain => 'table'))
 UNION ALL
 SELECT 'CLAIMS', ref_column_name, ref_arg_column_names, policy_kind, policy_name,
-       IFF(tag_name IS NULL, 'DIRECT', 'TAG: ' || tag_name || ' = ' || tag_value)
+       IFF(tag_name IS NULL, 'DIRECT', 'TAG: ' || tag_name || ' = ' || policy_name)
 FROM TABLE(smith_ins.information_schema.policy_references(
         ref_entity_name => 'smith_ins.core.claims', ref_entity_domain => 'table'))
 ORDER BY table_name, policy_kind, ref_column_name;

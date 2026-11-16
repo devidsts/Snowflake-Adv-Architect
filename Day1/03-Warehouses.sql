@@ -60,7 +60,7 @@ FROM snowflake_sample_data.tpch_sf10.lineitem
 GROUP BY 1, 2;
 
 SELECT warehouse_name, warehouse_size, total_elapsed_time / 1000 AS seconds
-FROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY_BY_SESSION())
+FROM TABLE(snowflake_sample_data.INFORMATION_SCHEMA.QUERY_HISTORY_BY_SESSION())
 WHERE query_tag = 'lab03-scale-up' AND query_type = 'SELECT'
 ORDER BY start_time;
 

@@ -70,7 +70,7 @@ SHOW PARAMETERS LIKE 'STATEMENT_TIMEOUT%' IN ACCOUNT;
 -- Snowflake billing » + Credit Card). That does not end the trial; AI usage is
 -- paid from trial credits. Hands-on #14 Part A (semantic views) works without
 -- it. Test now — an error here means AI is still disabled:
-SELECT AI_COMPLETE('claude-sonnet-4-5', 'Reply with the single word READY.') AS ai_status;
+--SELECT AI_COMPLETE('claude-sonnet-4-5', 'Reply with the single word READY.') AS ai_status;
 
 
 -- ──────────────────────────────────────────────────────────────────────────────

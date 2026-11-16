@@ -68,11 +68,10 @@ SELECT warehouse_name,
        SUM(bytes_spilled_to_local_storage)             AS spilled_local_bytes,
        SUM(bytes_spilled_to_remote_storage)            AS spilled_remote_bytes,
        ROUND(AVG(queued_overload_time) / 1000, 2)      AS avg_queued_s
-FROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY_BY_USER(
-        USER_NAME => CURRENT_USER(),
-        END_TIME_RANGE_START => DATEADD(hour, -2, CURRENT_TIMESTAMP()),
-        RESULT_LIMIT => 10000))
-WHERE warehouse_name IS NOT NULL
+FROM SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY
+WHERE user_name = CURRENT_USER()
+  AND start_time >= DATEADD(hour, -2, CURRENT_TIMESTAMP())
+  AND warehouse_name IS NOT NULL
 GROUP BY warehouse_name
 ORDER BY spilled_local_bytes DESC;
 -- [TEACHING NOTE]
@@ -82,3 +81,5 @@ ORDER BY spilled_local_bytes DESC;
 -- SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY and WAREHOUSE_LOAD_HISTORY over weeks.
 ALTER SESSION SET USE_CACHED_RESULT = TRUE;
 USE WAREHOUSE smith_wh;
+
+
