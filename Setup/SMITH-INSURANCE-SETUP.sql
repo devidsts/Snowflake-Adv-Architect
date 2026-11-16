@@ -33,6 +33,9 @@ CREATE WAREHOUSE IF NOT EXISTS smith_wh
     COMMENT = 'Smith Insurance course warehouse';
 USE WAREHOUSE smith_wh;
 
+GRANT USAGE ON WAREHOUSE smith_wh TO ROLE useradmin;
+GRANT USAGE ON WAREHOUSE smith_wh TO ROLE accountadmin;
+
 CREATE OR REPLACE DATABASE smith_ins COMMENT = 'Smith Insurance — SnowPro Advanced Architect course data';
 CREATE SCHEMA smith_ins.raw        COMMENT = 'Landing zone for files and feeds';
 CREATE SCHEMA smith_ins.core       COMMENT = 'Operational policy and claims system';
