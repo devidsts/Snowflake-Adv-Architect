@@ -44,7 +44,7 @@ FILE_FORMAT = (TYPE = CSV FIELD_OPTIONALLY_ENCLOSED_BY = '"') HEADER = TRUE SING
 
 COPY INTO @batch_stage/premium_updates/bad_
 FROM (SELECT policy_id, status,
-             IFF(MOD(TO_NUMBER(SUBSTR(policy_id, 5)), 300) = 1, 'N/A', annual_premium::VARCHAR) AS annual_premium  -- every 50th row of this file
+             IFF(MOD(TO_NUMBER(SUBSTR(policy_id, 5)), 50) = 0, 'N/A', annual_premium::VARCHAR) AS annual_premium
       FROM smith_ins.core.policies WHERE MOD(TO_NUMBER(SUBSTR(policy_id, 5)), 6) = 1)
 FILE_FORMAT = (TYPE = CSV FIELD_OPTIONALLY_ENCLOSED_BY = '"') HEADER = TRUE SINGLE = TRUE;
 
@@ -67,16 +67,33 @@ CREATE OR REPLACE TABLE premium_updates (
 -- rows and records the rest; VALIDATE() returns the rejected rows of a job.
 -- Re-running the same COPY loads 0 files: load metadata (64 days) prevents
 -- duplicates. FORCE = TRUE overrides it — and creates duplicates.
+-- LIMITATION: VALIDATION_MODE and VALIDATE() do not support COPY statements that
+-- transform data (a column list, or a SELECT with METADATA$FILENAME). Both fail with
+-- "Expression 'POLICY_ID' not supported within a VALIDATE expression". So we
+-- validate against a CHECK table whose columns match the file exactly, and run the
+-- real load (with lineage columns) into PREMIUM_UPDATES.
 
-COPY INTO premium_updates (policy_id, status, annual_premium)
+CREATE OR REPLACE TABLE premium_updates_check (
+    policy_id      VARCHAR(12),
+    status         VARCHAR(10),
+    annual_premium NUMBER(10,2)
+);
+
+-- 1) Dry run: parse the files, load nothing, return the errors (no column list, no SELECT).
+COPY INTO premium_updates_check
 FROM @batch_stage/premium_updates/
 VALIDATION_MODE = RETURN_ERRORS;
 
+-- 2) Real load with lineage (this is a transforming COPY, so it cannot be validated).
 COPY INTO premium_updates (policy_id, status, annual_premium, file_name)
 FROM (SELECT $1, $2, $3, METADATA$FILENAME FROM @batch_stage/premium_updates/)
 ON_ERROR = CONTINUE;
 
-SELECT * FROM TABLE(VALIDATE(premium_updates, JOB_ID => '_last'));
+-- 3) Rejected rows of a job: load the check table with ON_ERROR = CONTINUE, then VALIDATE it.
+COPY INTO premium_updates_check
+FROM @batch_stage/premium_updates/
+ON_ERROR = CONTINUE;
+SELECT * FROM TABLE(VALIDATE(premium_updates_check, JOB_ID => '_last'));
 
 COPY INTO premium_updates (policy_id, status, annual_premium, file_name)
 FROM (SELECT $1, $2, $3, METADATA$FILENAME FROM @batch_stage/premium_updates/)

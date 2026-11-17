@@ -19,6 +19,11 @@ Hands-on #05 — Cloning, Environments and Promotion          (25 minutes)
 USE ROLE sysadmin;
 USE WAREHOUSE smith_wh;
 
+GRANT USAGE ON DATABASE smith_ins TO ROLE smith_claims_analyst;
+GRANT USAGE ON SCHEMA smith_ins.analytics TO ROLE smith_claims_analyst;
+GRANT SELECT ON ALL TABLES IN SCHEMA smith_ins.analytics TO ROLE smith_claims_analyst;
+GRANT SELECT ON ALL VIEWS IN SCHEMA smith_ins.analytics TO ROLE smith_claims_analyst;
+
 -- ──────────────────────────────────────────────────────────────────────────────
 -- DEMO 1 │ Clone PROD into DEV
 -- ──────────────────────────────────────────────────────────────────────────────
@@ -104,6 +109,9 @@ SELECT COUNT(*) FROM smith_ins_dev.core.claim_reviews;            -- still 25 ro
 -- Build the next version of a reporting schema next to the live one, test it,
 -- then swap names in one atomic statement. Rollback = swap again.
 -- (Run with care: consumers are switched instantly.)
+-- After the SWAP, ANALYTICS_NEXT holds the ORIGINAL schema: it is the rollback
+-- target for Exercise 4. Do NOT re-run this demo (CREATE OR REPLACE would overwrite
+-- it) and do NOT run CLEANUP until Exercise 4 is finished.
 
 CREATE OR REPLACE SCHEMA smith_ins.analytics_next CLONE smith_ins_dev.analytics;
 CREATE OR REPLACE VIEW smith_ins.analytics_next.v_open_claims AS
@@ -113,13 +121,7 @@ FROM smith_ins.core.claims WHERE status IN ('OPEN', 'IN_REVIEW');
 ALTER SCHEMA smith_ins.analytics SWAP WITH smith_ins.analytics_next;
 SHOW VIEWS IN SCHEMA smith_ins.analytics ->> SELECT "name" FROM $1;     -- new release is live
 -- Rollback would be: ALTER SCHEMA smith_ins.analytics SWAP WITH smith_ins.analytics_next;
--- [INSTRUCTOR NOTE] Views keep their definition text through CLONE and SWAP.
--- A view cloned from SMITH_INS_DEV that names SMITH_INS_DEV tables still reads
--- DEV data after it goes live in SMITH_INS.ANALYTICS. Check every view's
--- references before promoting (and recreate any that point at DEV):
-SELECT table_name AS view_name, view_definition
-FROM smith_ins.information_schema.views
-WHERE table_schema = 'ANALYTICS' AND view_definition ILIKE '%SMITH_INS_DEV%';   -- expect no rows
+SHOW SCHEMAS LIKE 'ANALYTICS_NEXT' IN DATABASE smith_ins;               -- still exists: holds the original
 
 
 /*
@@ -169,6 +171,13 @@ WHERE table_schema = 'ANALYTICS' AND view_definition ILIKE '%SMITH_INS_DEV%';   
 --       confirm V_OPEN_CLAIMS is gone from SMITH_INS.ANALYTICS, and confirm
 --       SMITH_CLAIMS_ANALYST can still read ANALYTICS.CLAIMS_BY_REGION
 --       (created in Hands-on #01). If not, explain why in a comment.
+-- Prerequisite: Demo 5 has been run and CLEANUP has NOT. ANALYTICS_NEXT now holds
+--       the original schema and is your rollback target. This must return 1 row:
+SHOW SCHEMAS LIKE 'ANALYTICS_NEXT' IN DATABASE smith_ins;
+--       If it returns 0 rows, ask your instructor (or try UNDROP SCHEMA
+--       smith_ins.analytics_next; if it was dropped within the retention period).
+-- Bonus: BEFORE rolling back, while the new release is live, test whether
+--       SMITH_CLAIMS_ANALYST can read ANALYTICS.CLAIMS_BY_REGION. Note the result.
 
 
 -- YOUR CODE HERE
@@ -179,7 +188,10 @@ WHERE table_schema = 'ANALYTICS' AND view_definition ILIKE '%SMITH_INS_DEV%';   
   CLEANUP
 ================================================================================
 */
-USE ROLE sysadmin;
-DROP SCHEMA IF EXISTS smith_ins.analytics_next;
+-- Run ONLY after Exercise 4. Once the rollback swap is done, ANALYTICS_NEXT holds
+-- the buggy release, so dropping it is correct. Before the rollback it holds the
+-- ORIGINAL production schema, so do not drop it then.
+--USE ROLE sysadmin;
+--DROP SCHEMA IF EXISTS smith_ins.analytics_next;
 -- Keep SMITH_INS_DEV until the end of Day 2 (used for discussion), then:
 -- DROP DATABASE smith_ins_dev;

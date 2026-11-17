@@ -116,9 +116,12 @@ SHOW TABLES IN DATABASE smith_ins
 ->> SELECT "schema_name", "name", "kind", "retention_time" FROM $1
     WHERE "name" IN ('CLAIMS', 'CLAIMS_STAGING') ORDER BY 1;
 
-SELECT table_schema, table_name, is_transient, active_bytes, time_travel_bytes, failsafe_bytes
-FROM smith_ins.information_schema.table_storage_metrics
-WHERE table_name IN ('CLAIMS', 'CLAIMS_WORK', 'CLAIMS_STAGING') AND NOT deleted;
+SELECT table_catalog, table_schema, table_name, is_transient,
+       active_bytes, time_travel_bytes, failsafe_bytes
+FROM snowflake.account_usage.table_storage_metrics
+WHERE table_catalog = 'SMITH_INS'
+  AND table_name IN ('CLAIMS', 'CLAIMS_WORK', 'CLAIMS_STAGING')
+  AND NOT deleted;
 
 
 -- ──────────────────────────────────────────────────────────────────────────────

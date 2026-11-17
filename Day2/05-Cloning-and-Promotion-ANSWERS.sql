@@ -65,18 +65,46 @@ SELECT COUNT(*), COUNT_IF(NOT escalated) FROM smith_ins_dev.core.claim_reviews; 
 -- ──────────────────────────────────────────────────────────────────────────────
 -- EXERCISE 4 │ CHALLENGE — Roll Back the Release
 -- ──────────────────────────────────────────────────────────────────────────────
+-- Prerequisite: Demo 5 was run and CLEANUP was not. ANALYTICS_NEXT holds the ORIGINAL
+-- schema after the Demo 5 swap. Must return 1 row (if dropped: UNDROP SCHEMA
+-- smith_ins.analytics_next; within the Time Travel retention period).
+SHOW SCHEMAS LIKE 'ANALYTICS_NEXT' IN DATABASE smith_ins;
+
+-- Bonus (while the new release is still live): the analyst is locked out.
+-- Non-failing proof, as SYSADMIN: the live (cloned) schema has no USAGE grant for the analyst.
+SHOW GRANTS ON SCHEMA smith_ins.analytics ->> SELECT "privilege", "grantee_name" FROM $1;
+-- Optional live demo. EXPECTED TO FAIL with "Schema ... does not exist or not authorized".
+-- A failure aborts "Run all" and leaves the session on the analyst role, so run these
+-- three lines on their own, then run the USE ROLE sysadmin line BEFORE the rollback.
+-- USE ROLE smith_claims_analyst;
+-- USE SECONDARY ROLES NONE;
+-- SELECT * FROM smith_ins.analytics.claims_by_region;
+USE ROLE sysadmin;
+
+-- The rollback: one statement
 ALTER SCHEMA smith_ins.analytics SWAP WITH smith_ins.analytics_next;
 
 SHOW VIEWS IN SCHEMA smith_ins.analytics ->> SELECT "name" FROM $1;   -- no V_OPEN_CLAIMS
 
 USE ROLE smith_claims_analyst;
 USE SECONDARY ROLES NONE;
-SELECT * FROM smith_ins.analytics.claims_by_region;
+SELECT * FROM smith_ins.analytics.claims_by_region;   -- must now succeed
 USE ROLE sysadmin;
+-- If THIS select fails with "Schema 'SMITH_INS.ANALYTICS' does not exist or not
+-- authorized", the original schema never had the analyst grants (Hands-on #01 not
+-- run, or run under different roles). Check and repair as SYSADMIN:
+--   SHOW GRANTS ON SCHEMA smith_ins.analytics;
+--   GRANT USAGE ON DATABASE smith_ins TO ROLE smith_claims_analyst;
+--   GRANT USAGE ON SCHEMA smith_ins.analytics TO ROLE smith_claims_analyst;
+--   GRANT SELECT ON ALL TABLES IN SCHEMA smith_ins.analytics TO ROLE smith_claims_analyst;
 -- [TEACHING NOTE]
 -- After rollback the original ANALYTICS schema is back with its own schema-level
 -- grants, so the analyst can read it again. Ask the class to test access WHILE
 -- the release was live: the swapped-in schema was a clone, whose container
--- grants (USAGE for SMITH_ANALYTICS_RO) were not cloned — a classic
+-- grants (USAGE for SMITH_CLAIMS_ANALYST) were not cloned — a classic
 -- promotion-day outage. Fix: apply schema grants as part of the deployment
 -- script, or grant at the database level with future grants.
+-- Also point out: this exercise only works because ANALYTICS_NEXT still exists.
+-- After the swap it holds the original schema, so CLEANUP must run after this
+-- exercise, never before, and Demo 5 must not be re-run (CREATE OR REPLACE would
+-- overwrite the rollback target).
