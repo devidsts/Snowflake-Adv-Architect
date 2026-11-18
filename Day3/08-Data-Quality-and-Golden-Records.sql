@@ -42,9 +42,11 @@ USE SCHEMA smith_ins.core;
 SELECT SNOWFLAKE.CORE.NULL_COUNT(SELECT email FROM policyholders)          AS null_emails,
        SNOWFLAKE.CORE.NULL_PERCENT(SELECT email FROM policyholders)        AS null_email_pct,
        SNOWFLAKE.CORE.DUPLICATE_COUNT(SELECT ssn FROM policyholders)       AS dup_ssn_exact,
-       SNOWFLAKE.CORE.FRESHNESS(SELECT updated_at FROM claims) / 3600      AS claims_hours_stale;
+       SNOWFLAKE.CORE.FRESHNESS(SELECT updated_at::TIMESTAMP_LTZ FROM claims) / 3600 AS claims_hours_stale;
 -- dup_ssn_exact is 0 — the portal stores SSNs without dashes, so exact matching
 -- misses every duplicate. Remember that for Demo 4.
+-- FRESHNESS accepts only DATE, TIMESTAMP_LTZ or TIMESTAMP_TZ (not TIMESTAMP_NTZ),
+-- hence the cast. It returns seconds, so / 3600 gives hours.
 
 
 -- ──────────────────────────────────────────────────────────────────────────────
@@ -187,6 +189,9 @@ SELECT * FROM smith_ins.analytics.policyholder_golden WHERE source_records > 1 L
 -- Task: On SMITH_INS.RAW.CLAIMS_FEED_RAW (Hands-on #06) set the schedule to
 --       TRIGGER_ON_CHANGES and add ROW_COUNT plus FRESHNESS on LOADED_AT.
 --       Confirm both appear in DATA_METRIC_FUNCTION_REFERENCES.
+-- [HINT] FRESHNESS needs a DATE, TIMESTAMP_LTZ or TIMESTAMP_TZ column. Check
+--        DESC TABLE first; if LOADED_AT is TIMESTAMP_NTZ, wrap the cast in a
+--        custom DMF (see Demo 3) because a cast is not allowed inside ON (...).
 
 
 -- YOUR CODE HERE
@@ -233,7 +238,12 @@ SELECT * FROM smith_ins.analytics.policyholder_golden WHERE source_records > 1 L
   CLEANUP
   Keep the golden tables (used by #14). Remove the scratch clone and the
   5-minute schedule so the serverless DMF credits stay small.
+  NOTE: UNSET DATA_METRIC_SCHEDULE only resets the schedule to the 60 MINUTE
+  default; the DMFs keep running. To actually stop the credits, drop the DMFs
+  (or suspend them with SET DATA_METRIC_SCHEDULE = '').
 ================================================================================
 */
 DROP TABLE IF EXISTS smith_ins.core.claims_dq_test;
+ALTER TABLE smith_ins.core.policyholders DROP DATA METRIC FUNCTION SNOWFLAKE.CORE.NULL_PERCENT ON (email);
+ALTER TABLE smith_ins.core.policyholders DROP DATA METRIC FUNCTION SNOWFLAKE.CORE.ROW_COUNT ON ();
 ALTER TABLE smith_ins.core.policyholders UNSET DATA_METRIC_SCHEDULE;
